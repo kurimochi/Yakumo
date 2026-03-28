@@ -21,12 +21,35 @@ contract YakumoStoreTest is Test {
         stdstore.target(address(store)).sig("idCounter()").checked_write(value);
     }
 
-    function _setWork(uint256 id, address creator, bytes32 metadataUri, bool transferable, uint256 price) internal {
-        stdstore.target(address(store)).sig("works(uint256)").with_key(id).depth(0)
-            .checked_write(uint256(uint160(creator)));
-        stdstore.target(address(store)).sig("works(uint256)").with_key(id).depth(1).checked_write(uint256(metadataUri));
-        stdstore.target(address(store)).sig("works(uint256)").with_key(id).depth(2).checked_write(transferable ? 1 : 0);
-        stdstore.target(address(store)).sig("works(uint256)").with_key(id).depth(3).checked_write(price);
+    function _setWork(uint256 id, address creator, string memory metadataUri, bool transferable, uint256 price)
+        internal
+    {
+        bytes32 structSlot = keccak256(abi.encode(id, uint256(4)));
+        bytes32 metadataUriSlot = bytes32(uint256(structSlot) + 1);
+
+        vm.store(address(store), structSlot, bytes32(uint256(uint160(creator))));
+        vm.store(address(store), bytes32(uint256(structSlot) + 2), bytes32(transferable ? uint256(1) : uint256(0)));
+        vm.store(address(store), bytes32(uint256(structSlot) + 3), bytes32(price));
+
+        bytes memory metadataUriBytes = bytes(metadataUri);
+        if (metadataUriBytes.length <= 31) {
+            bytes32 dataWord;
+            assembly {
+                dataWord := mload(add(metadataUriBytes, 32))
+            }
+            uint256 encoded = (uint256(dataWord) & ~uint256(0xff)) | (metadataUriBytes.length * 2);
+            vm.store(address(store), metadataUriSlot, bytes32(encoded));
+        } else {
+            vm.store(address(store), metadataUriSlot, bytes32(uint256(metadataUriBytes.length) * 2 + 1));
+            bytes32 dataSlot = keccak256(abi.encode(metadataUriSlot));
+            for (uint256 i = 0; i < (metadataUriBytes.length + 31) / 32; i++) {
+                bytes32 chunk;
+                assembly {
+                    chunk := mload(add(add(metadataUriBytes, 32), mul(i, 32)))
+                }
+                vm.store(address(store), bytes32(uint256(dataSlot) + i), chunk);
+            }
+        }
     }
 
     function _setPendingWithdrawal(address account, uint256 amount) internal {
@@ -40,7 +63,7 @@ contract YakumoStoreTest is Test {
 
     function test_RegisterWork() public {
         address creator = makeAddr("1");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -51,7 +74,7 @@ contract YakumoStoreTest is Test {
         uint256 id = store.registerWork(metadataUri, transferable, price);
 
         assertEq(id, 0);
-        (address workCreator, bytes32 workMetadataUri, bool workTransferable, uint256 workPrice) = store.works(0);
+        (address workCreator, string memory workMetadataUri, bool workTransferable, uint256 workPrice) = store.works(0);
         assertEq(workCreator, creator);
         assertEq(workMetadataUri, metadataUri);
         assertEq(workTransferable, transferable);
@@ -64,7 +87,7 @@ contract YakumoStoreTest is Test {
         stdstore.target(address(store)).sig("idCounter()").checked_write(UINT256_MAX);
 
         address creator = makeAddr("1");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -76,7 +99,7 @@ contract YakumoStoreTest is Test {
 
     function test_SetPrice() public {
         address creator = makeAddr("1");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
 
         uint256 previousPrice = 1 ether;
@@ -99,7 +122,7 @@ contract YakumoStoreTest is Test {
     function test_SetPriceNotCreator() public {
         address creator = makeAddr("1");
         address attacker = makeAddr("2");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
 
         uint256 previousPrice = 1 ether;
@@ -117,7 +140,7 @@ contract YakumoStoreTest is Test {
     function test_Puchase() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -151,14 +174,14 @@ contract YakumoStoreTest is Test {
         address creator2 = makeAddr("2");
         address buyer = makeAddr("3");
 
-        bytes32 metadataUri1 = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri1 = "hogehoge";
         bool transferable1 = false;
         uint256 price1 = 1 ether;
 
         uint256 id1 = 0;
         _setWork(id1, creator1, metadataUri1, transferable1, price1);
 
-        bytes32 metadataUri2 = 0x6675676166756761000000000000000000000000000000000000000000000000;
+        string memory metadataUri2 = "fugafuga";
         bool transferable2 = false;
         uint256 price2 = 2 ether;
 
@@ -232,7 +255,7 @@ contract YakumoStoreTest is Test {
     function test_PurchaseIncorrectPaymentLess() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -256,7 +279,7 @@ contract YakumoStoreTest is Test {
     function test_PurchaseIncorrectPaymentGreater() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -347,7 +370,7 @@ contract YakumoStoreTest is Test {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         address receiver = makeAddr("3");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = true;
         uint256 price = 1 ether;
 
@@ -369,7 +392,7 @@ contract YakumoStoreTest is Test {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         address receiver = makeAddr("3");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 
@@ -387,7 +410,7 @@ contract YakumoStoreTest is Test {
         address owner = makeAddr("2");
         address spender = makeAddr("3");
         address receiver = makeAddr("4");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = true;
         uint256 price = 1 ether;
 
@@ -413,7 +436,7 @@ contract YakumoStoreTest is Test {
         address owner = makeAddr("2");
         address spender = makeAddr("3");
         address receiver = makeAddr("4");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
 

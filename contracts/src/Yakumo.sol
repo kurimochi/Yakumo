@@ -6,7 +6,7 @@ import {ERC6909} from "@openzeppelin/contracts/token/ERC6909/ERC6909.sol";
 contract YakumoStore is ERC6909 {
     struct Work {
         address creator;
-        bytes32 metadataUri;
+        string metadataUri;
         bool transferable;
         uint256 price;
     }
@@ -30,7 +30,7 @@ contract YakumoStore is ERC6909 {
     error WithdrawalFailed();
     error NonTransferable();
 
-    function registerWork(bytes32 metadataUri, bool transferable, uint256 price) external returns (uint256) {
+    function registerWork(string calldata metadataUri, bool transferable, uint256 price) external returns (uint256) {
         works[idCounter] =
             Work({creator: msg.sender, metadataUri: metadataUri, transferable: transferable, price: price});
         emit WorkRegistered(idCounter, msg.sender);

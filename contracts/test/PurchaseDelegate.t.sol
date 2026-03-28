@@ -20,7 +20,7 @@ contract PurchaseDelegateTest is Test {
         delegate = new PurchaseDelegate();
 
         sponsor = makeAddr("1");
-        bytes32 metadataUri = 0x686f6765686f6765000000000000000000000000000000000000000000000000;
+        string memory metadataUri = "hogehoge";
         bool transferable = false;
 
         vm.prank(sponsor);
