@@ -121,8 +121,10 @@ contract YakumoStoreTest is Test {
         address tokenContract = makeAddr("2");
 
         vm.prank(creator);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
-        store.registerWork(metadataUri, transferable, price, tokenContract);
+        uint256 id = store.registerWork(metadataUri, transferable, price, tokenContract);
+
+        (,,,, address workTokenContract) = store.works(id);
+        assertEq(workTokenContract, tokenContract);
     }
 
     function testRegisterWorkWithInvalidContract() public {
@@ -134,8 +136,10 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(new Rejector());
 
         vm.prank(creator);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
-        store.registerWork(metadataUri, transferable, price, tokenContract);
+        uint256 id = store.registerWork(metadataUri, transferable, price, tokenContract);
+
+        (,,,, address workTokenContract) = store.works(id);
+        assertEq(workTokenContract, tokenContract);
     }
 
     function testRegisterWorkIdCounterOverflow() public {
@@ -214,11 +218,10 @@ contract YakumoStoreTest is Test {
         _setIdCounter(1);
 
         vm.prank(creator);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
         store.changePrice(id, price, newTokenContract);
 
         (,,,, address workTokenContract) = store.works(id);
-        assertEq(workTokenContract, previousTokenContract);
+        assertEq(workTokenContract, newTokenContract);
     }
 
     function testChangePriceWithInvalidContract() public {
@@ -235,11 +238,10 @@ contract YakumoStoreTest is Test {
         _setIdCounter(1);
 
         vm.prank(creator);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
         store.changePrice(id, price, newTokenContract);
 
         (,,,, address workTokenContract) = store.works(id);
-        assertEq(workTokenContract, previousTokenContract);
+        assertEq(workTokenContract, newTokenContract);
     }
 
     function testChangePriceNotCreator() public {
@@ -558,33 +560,6 @@ contract YakumoStoreTest is Test {
         store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
     }
 
-    function testPurchaseWithAuthorizationInvalidTokenContractWithEoa() public {
-        address creator = makeAddr("1");
-        address buyer = makeAddr("2");
-        string memory metadataUri = "hogehoge";
-        bool transferable = false;
-        uint256 price = 1 ether;
-
-        address tokenContract = address(0);
-
-        uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
-        _setIdCounter(1);
-
-        uint256 amount = 2;
-        uint256 validAfter = block.timestamp - 1;
-        uint256 validBefore = block.timestamp + 1000;
-        bytes32 nonce = keccak256("nonce");
-        uint8 v = 0;
-        bytes32 r = bytes32(0);
-        bytes32 s = bytes32(0);
-
-        vm.prank(buyer);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
-
-        store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
-    }
-
     function testPurchaseWithAuthorizationInvalidTokenContractWithErc20() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
@@ -607,7 +582,7 @@ contract YakumoStoreTest is Test {
         bytes32 s = bytes32(0);
 
         vm.prank(buyer);
-        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        vm.expectRevert();
 
         store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
     }

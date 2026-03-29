@@ -39,9 +39,6 @@ contract YakumoStore is ERC6909 {
         external
         returns (uint256)
     {
-        if (tokenContract != address(0) && !_supportsErc20(tokenContract)) {
-            revert InvalidTokenContract();
-        }
         works[idCounter] = Work({
             creator: msg.sender,
             metadataUri: metadataUri,
@@ -61,9 +58,6 @@ contract YakumoStore is ERC6909 {
         }
         if (msg.sender != works[id].creator) {
             revert NotCreator();
-        }
-        if (newTokenContract != address(0) && !_supportsErc20(newTokenContract)) {
-            revert InvalidTokenContract();
         }
 
         uint256 previousPrice = works[id].price;
@@ -132,10 +126,9 @@ contract YakumoStore is ERC6909 {
         }
 
         address tokenContract = works[id].tokenContract;
-        if (!_supportsErc3009(tokenContract)) {
+        if (tokenContract.code.length == 0) {
             revert InvalidTokenContract();
         }
-
         uint256 total = works[id].price * amount;
         IERC3009(tokenContract)
             .transferWithAuthorization(buyer, works[id].creator, total, validAfter, validBefore, nonce, v, r, s);
@@ -191,32 +184,5 @@ contract YakumoStore is ERC6909 {
         bool result = super.transferFrom(sender, receiver, id, amount);
         emit EditionTransferred(id, sender, receiver, amount);
         return result;
-    }
-
-    bytes4 constant TOTAL_SUPPLY_SELECTOR = bytes4(keccak256("totalSupply()"));
-    bytes4 constant BALANCE_OF_SELECTOR = bytes4(keccak256("balanceOf(address)"));
-
-    function _supportsErc20(address tokenContract) internal view returns (bool) {
-        (bool totalSupplyOk, bytes memory totalSupplyData) =
-            tokenContract.staticcall(abi.encodeWithSelector(TOTAL_SUPPLY_SELECTOR));
-        if (!totalSupplyOk || totalSupplyData.length < 32) {
-            return false;
-        }
-
-        (bool balanceOfOk, bytes memory balanceOfData) =
-            tokenContract.staticcall(abi.encodeWithSelector(BALANCE_OF_SELECTOR, address(this)));
-        if (!balanceOfOk || balanceOfData.length < 32) {
-            return false;
-        }
-
-        return true;
-    }
-
-    bytes4 constant AUTHORIZATION_STATE_SELECTOR = bytes4(keccak256("authorizationState(address,bytes32)"));
-
-    function _supportsErc3009(address tokenContract) internal view returns (bool) {
-        (bool authorizationStateOk, bytes memory authorizationStateData) =
-            tokenContract.staticcall(abi.encodeWithSelector(AUTHORIZATION_STATE_SELECTOR, address(this), bytes32(0)));
-        return authorizationStateOk && authorizationStateData.length >= 32;
     }
 }
