@@ -98,7 +98,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.idCounter(), 1);
     }
 
-    function test_RegisterWorkWithERC20() public {
+    function test_RegisterWorkWithErc20() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -110,7 +110,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_RegisterWorkWithEOA() public {
+    function test_RegisterWorkWithEoa() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -151,7 +151,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_SetPrice() public {
+    function test_ChangePrice() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -174,7 +174,7 @@ contract YakumoStoreTest is Test {
         assertEq(price, newPrice);
     }
 
-    function test_SetPriceNotCreator() public {
+    function test_ChangePriceNotCreator() public {
         address creator = makeAddr("1");
         address attacker = makeAddr("2");
         string memory metadataUri = "hogehoge";
@@ -193,7 +193,7 @@ contract YakumoStoreTest is Test {
         store.changePrice(id, newPrice);
     }
 
-    function test_Puchase() public {
+    function test_Purchase() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         string memory metadataUri = "hogehoge";
