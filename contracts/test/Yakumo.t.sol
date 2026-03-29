@@ -9,7 +9,6 @@ import {Rejector} from "./Rejector.sol";
 import {ReentrancyAttaker} from "./Reentrance.sol";
 import {TestERC20Token, FalseERC20Token, TestERC3009Token} from "./Tokens.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC3009} from "../src/IERC3009.sol";
 
 contract YakumoStoreTest is Test {
     using stdStorage for StdStorage;
@@ -488,7 +487,7 @@ contract YakumoStoreTest is Test {
         FalseERC20Token(tokenContract).mint(buyer, total);
 
         vm.prank(buyer);
-        vm.expectRevert(YakumoStore.TransferFailed.selector);
+        vm.expectRevert();
 
         store.purchaseWithErc20(id, amount);
     }

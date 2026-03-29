@@ -86,4 +86,19 @@ contract PurchaseDelegateTest is Test {
         assertEq(token.balanceOf(sponsor), price);
         assertLe(sponsor.balance, 10 ether);
     }
+
+    function testExecutePurchaseWithErc20InvalidTokenContract() public {
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+        address tokenContract = address(0);
+
+        uint256 id = store.registerWork(metadataUri, transferable, price, tokenContract);
+
+        vm.signAndAttachDelegation(address(delegate), secretKey);
+
+        vm.prank(sponsor);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        PurchaseDelegate(delegator).executePurchaseWithErc20(store, id, 1);
+    }
 }

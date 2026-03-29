@@ -3,9 +3,12 @@ pragma solidity ^0.8.0;
 
 import {ERC6909} from "@openzeppelin/contracts/token/ERC6909/ERC6909.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC3009} from "./IERC3009.sol";
 
 contract YakumoStore is ERC6909 {
+    using SafeERC20 for IERC20;
+
     struct Work {
         address creator;
         string metadataUri;
@@ -29,7 +32,6 @@ contract YakumoStore is ERC6909 {
     error ArrayLengthMismatch();
     error InvalidWorkId();
     error IncorrectPayment();
-    error TransferFailed();
     error NoPendingWithdrawal();
     error WithdrawalFailed();
     error NonTransferable();
@@ -99,10 +101,7 @@ contract YakumoStore is ERC6909 {
         }
 
         uint256 total = works[id].price * amount;
-        bool success = IERC20(tokenContract).transferFrom(msg.sender, works[id].creator, total);
-        if (!success) {
-            revert TransferFailed();
-        }
+        IERC20(tokenContract).safeTransferFrom(msg.sender, works[id].creator, total);
 
         _mint(msg.sender, id, amount);
         emit EditionMinted(id, msg.sender, amount);
