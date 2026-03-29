@@ -22,9 +22,10 @@ contract PurchaseDelegateTest is Test {
         sponsor = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
+        address tokenContract = address(0);
 
         vm.prank(sponsor);
-        id = store.registerWork(metadataUri, transferable, price);
+        id = store.registerWork(metadataUri, transferable, price, tokenContract);
 
         (delegator, secretKey) = makeAddrAndKey("2");
     }

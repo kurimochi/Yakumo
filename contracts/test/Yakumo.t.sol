@@ -7,6 +7,7 @@ import {stdError} from "forge-std/StdError.sol";
 import {YakumoStore} from "../src/Yakumo.sol";
 import {Rejector} from "./Rejector.sol";
 import {ReentrancyAttaker} from "./Reentrance.sol";
+import {TestERC20Token} from "./Tokens.sol";
 
 contract YakumoStoreTest is Test {
     using stdStorage for StdStorage;
@@ -21,15 +22,21 @@ contract YakumoStoreTest is Test {
         stdstore.target(address(store)).sig("idCounter()").checked_write(value);
     }
 
-    function _setWork(uint256 id, address creator, string memory metadataUri, bool transferable, uint256 price)
-        internal
-    {
+    function _setWork(
+        uint256 id,
+        address creator,
+        string memory metadataUri,
+        bool transferable,
+        uint256 price,
+        address tokenContract
+    ) internal {
         bytes32 structSlot = keccak256(abi.encode(id, uint256(4)));
         bytes32 metadataUriSlot = bytes32(uint256(structSlot) + 1);
 
         vm.store(address(store), structSlot, bytes32(uint256(uint160(creator))));
         vm.store(address(store), bytes32(uint256(structSlot) + 2), bytes32(transferable ? uint256(1) : uint256(0)));
         vm.store(address(store), bytes32(uint256(structSlot) + 3), bytes32(price));
+        vm.store(address(store), bytes32(uint256(structSlot) + 5), bytes32(uint256(uint160(tokenContract))));
 
         bytes memory metadataUriBytes = bytes(metadataUri);
         if (metadataUriBytes.length <= 31) {
@@ -66,21 +73,67 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
         vm.prank(creator);
         vm.expectEmit(true, true, false, false);
         emit YakumoStore.WorkRegistered(0, creator);
 
-        uint256 id = store.registerWork(metadataUri, transferable, price);
+        uint256 id = store.registerWork(metadataUri, transferable, price, tokenContract);
 
         assertEq(id, 0);
-        (address workCreator, string memory workMetadataUri, bool workTransferable, uint256 workPrice) = store.works(0);
+        (
+            address workCreator,
+            string memory workMetadataUri,
+            bool workTransferable,
+            uint256 workPrice,
+            address workTokenContract
+        ) = store.works(0);
         assertEq(workCreator, creator);
         assertEq(workMetadataUri, metadataUri);
         assertEq(workTransferable, transferable);
         assertEq(workPrice, price);
+        assertEq(workTokenContract, tokenContract);
 
         assertEq(store.idCounter(), 1);
+    }
+
+    function test_RegisterWorkWithERC20() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new TestERC20Token());
+
+        vm.prank(creator);
+        store.registerWork(metadataUri, transferable, price, tokenContract);
+    }
+
+    function test_RegisterWorkWithEOA() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = makeAddr("2");
+
+        vm.prank(creator);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        store.registerWork(metadataUri, transferable, price, tokenContract);
+    }
+
+    function test_RegisterWorkWithInvalidContract() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new Rejector());
+
+        vm.prank(creator);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
     function test_RegisterWorkIdCounterOverflow() public {
@@ -90,23 +143,25 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
         vm.prank(creator);
         vm.expectRevert(stdError.arithmeticError);
 
-        store.registerWork(metadataUri, transferable, price);
+        store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
     function test_SetPrice() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
+        address tokenContract = address(0);
 
         uint256 previousPrice = 1 ether;
         uint256 newPrice = 2 ether;
 
         uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, previousPrice);
+        _setWork(id, creator, metadataUri, transferable, previousPrice, tokenContract);
         _setIdCounter(1);
 
         vm.expectEmit(true, false, false, true);
@@ -115,7 +170,7 @@ contract YakumoStoreTest is Test {
         vm.prank(creator);
         store.changePrice(id, newPrice);
 
-        (,,, uint256 price) = store.works(id);
+        (,,, uint256 price,) = store.works(id);
         assertEq(price, newPrice);
     }
 
@@ -124,12 +179,13 @@ contract YakumoStoreTest is Test {
         address attacker = makeAddr("2");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
+        address tokenContract = address(0);
 
         uint256 previousPrice = 1 ether;
         uint256 newPrice = 2 ether;
 
         uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, previousPrice);
+        _setWork(id, creator, metadataUri, transferable, previousPrice, tokenContract);
         _setIdCounter(1);
 
         vm.prank(attacker);
@@ -143,9 +199,10 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
         uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, price);
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
         _setIdCounter(1);
 
         uint256 amount = 2;
@@ -183,9 +240,10 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
         uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, price);
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
         _setIdCounter(1);
 
         uint256 amount = 2;
@@ -202,9 +260,10 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
         uint256 id = 0;
-        _setWork(id, creator, metadataUri, transferable, price);
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
         _setIdCounter(1);
 
         uint256 amount = 2;
@@ -288,8 +347,9 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = true;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
-        _setWork(0, creator, metadataUri, transferable, price);
+        _setWork(0, creator, metadataUri, transferable, price, tokenContract);
         _setBalance(buyer, 0, 1);
 
         vm.prank(buyer);
@@ -310,8 +370,9 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
-        _setWork(0, creator, metadataUri, transferable, price);
+        _setWork(0, creator, metadataUri, transferable, price, tokenContract);
         _setBalance(buyer, 0, 1);
 
         vm.prank(buyer);
@@ -328,8 +389,9 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = true;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
-        _setWork(0, creator, metadataUri, transferable, price);
+        _setWork(0, creator, metadataUri, transferable, price, tokenContract);
         _setBalance(owner, 0, 2);
 
         vm.prank(owner);
@@ -354,8 +416,9 @@ contract YakumoStoreTest is Test {
         string memory metadataUri = "hogehoge";
         bool transferable = false;
         uint256 price = 1 ether;
+        address tokenContract = address(0);
 
-        _setWork(0, creator, metadataUri, transferable, price);
+        _setWork(0, creator, metadataUri, transferable, price, tokenContract);
         _setBalance(owner, 0, 1);
 
         vm.prank(owner);

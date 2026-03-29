@@ -9,6 +9,7 @@ contract YakumoStore is ERC6909 {
         string metadataUri;
         bool transferable;
         uint256 price;
+        address tokenContract;
     }
 
     uint256 public idCounter = 0;
@@ -29,10 +30,22 @@ contract YakumoStore is ERC6909 {
     error NoPendingWithdrawal();
     error WithdrawalFailed();
     error NonTransferable();
+    error InvalidTokenContract();
 
-    function registerWork(string calldata metadataUri, bool transferable, uint256 price) external returns (uint256) {
-        works[idCounter] =
-            Work({creator: msg.sender, metadataUri: metadataUri, transferable: transferable, price: price});
+    function registerWork(string calldata metadataUri, bool transferable, uint256 price, address tokenContract)
+        external
+        returns (uint256)
+    {
+        if (tokenContract != address(0) && !_supportsErc20(tokenContract)) {
+            revert InvalidTokenContract();
+        }
+        works[idCounter] = Work({
+            creator: msg.sender,
+            metadataUri: metadataUri,
+            transferable: transferable,
+            price: price,
+            tokenContract: tokenContract
+        });
         emit WorkRegistered(idCounter, msg.sender);
 
         idCounter++;
@@ -106,5 +119,24 @@ contract YakumoStore is ERC6909 {
         bool result = super.transferFrom(sender, receiver, id, amount);
         emit EditionTransferred(id, sender, receiver, amount);
         return result;
+    }
+
+    bytes4 constant TOTAL_SUPPLY_SELECTOR = bytes4(keccak256("totalSupply()"));
+    bytes4 constant BALANCE_OF_SELECTOR = bytes4(keccak256("balanceOf(address)"));
+
+    function _supportsErc20(address tokenContract) internal view returns (bool) {
+        (bool totalSupplyOk, bytes memory totalSupplyData) =
+            tokenContract.staticcall(abi.encodeWithSelector(TOTAL_SUPPLY_SELECTOR));
+        if (!totalSupplyOk || totalSupplyData.length < 32) {
+            return false;
+        }
+
+        (bool balanceOfOk, bytes memory balanceOfData) =
+            tokenContract.staticcall(abi.encodeWithSelector(BALANCE_OF_SELECTOR, address(this)));
+        if (!balanceOfOk || balanceOfData.length < 32) {
+            return false;
+        }
+
+        return true;
     }
 }
