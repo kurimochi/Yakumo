@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import {ERC6909} from "@openzeppelin/contracts/token/ERC6909/ERC6909.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC3009} from "./IERC3009.sol";
 
 contract YakumoStore is ERC6909 {
     struct Work {
@@ -112,6 +113,36 @@ contract YakumoStore is ERC6909 {
         emit Purchased(msg.sender, id, amount);
     }
 
+    function purchaseWithAuthorization(
+        address buyer,
+        uint256 id,
+        uint256 amount,
+        uint256 validAfter,
+        uint256 validBefore,
+        bytes32 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
+
+        address tokenContract = works[id].tokenContract;
+        if (!_supportsErc3009(tokenContract)) {
+            revert InvalidTokenContract();
+        }
+
+        uint256 total = works[id].price * amount;
+        IERC3009(tokenContract)
+            .transferWithAuthorization(buyer, works[id].creator, total, validAfter, validBefore, nonce, v, r, s);
+
+        _mint(buyer, id, amount);
+        emit EditionMinted(id, buyer, amount);
+
+        emit Purchased(buyer, id, amount);
+    }
+
     function withdraw() external {
         uint256 amount = pendingWithdrawals[msg.sender];
         if (amount == 0) {
@@ -170,5 +201,13 @@ contract YakumoStore is ERC6909 {
         }
 
         return true;
+    }
+
+    bytes4 constant AUTHORIZATION_STATE_SELECTOR = bytes4(keccak256("authorizationState(address,bytes32)"));
+
+    function _supportsErc3009(address tokenContract) internal view returns (bool) {
+        (bool authorizationStateOk, bytes memory authorizationStateData) =
+            tokenContract.staticcall(abi.encodeWithSelector(AUTHORIZATION_STATE_SELECTOR, address(this), bytes32(0)));
+        return authorizationStateOk && authorizationStateData.length >= 32;
     }
 }

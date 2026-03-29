@@ -7,8 +7,9 @@ import {stdError} from "forge-std/StdError.sol";
 import {YakumoStore} from "../src/Yakumo.sol";
 import {Rejector} from "./Rejector.sol";
 import {ReentrancyAttaker} from "./Reentrance.sol";
-import {TestERC20Token, FalseERC20Token} from "./Tokens.sol";
+import {TestERC20Token, FalseERC20Token, TestERC3009Token} from "./Tokens.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC3009} from "../src/IERC3009.sol";
 
 contract YakumoStoreTest is Test {
     using stdStorage for StdStorage;
@@ -386,7 +387,14 @@ contract YakumoStoreTest is Test {
 
         vm.startPrank(buyer);
         IERC20(tokenContract).approve(address(store), total);
+
+        vm.expectEmit(true, true, false, true);
+        emit YakumoStore.EditionMinted(id, buyer, amount);
+        vm.expectEmit(true, true, false, true);
+        emit YakumoStore.Purchased(buyer, id, amount);
+
         store.purchaseWithErc20(id, amount);
+        vm.stopPrank();
 
         assertEq(store.balanceOf(buyer, id), amount);
         assertEq(IERC20(tokenContract).balanceOf(buyer), 0);
@@ -472,6 +480,127 @@ contract YakumoStoreTest is Test {
         vm.expectRevert(YakumoStore.TransferFailed.selector);
 
         store.purchaseWithErc20(id, amount);
+    }
+
+    function testPurchaseWithAuthorization() public {
+        address creator = makeAddr("1");
+        (address buyer, uint256 buyerPrivateKey) = makeAddrAndKey("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new TestERC3009Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 total = price * amount;
+
+        TestERC3009Token(tokenContract).mint(buyer, total);
+
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1000;
+        bytes32 nonce = keccak256("nonce");
+        bytes32 structHash = keccak256(
+            abi.encode(
+                TestERC3009Token(tokenContract).TRANSFER_WITH_AUTHORIZATION_TYPEHASH(),
+                buyer,
+                creator,
+                total,
+                validAfter,
+                validBefore,
+                nonce
+            )
+        );
+        bytes32 digest = TestERC3009Token(tokenContract).hashTypedDataV4(structHash);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(buyerPrivateKey, digest);
+
+        vm.expectEmit(true, true, false, true);
+        emit YakumoStore.EditionMinted(id, buyer, amount);
+        vm.expectEmit(true, true, false, true);
+        emit YakumoStore.Purchased(buyer, id, amount);
+
+        vm.prank(creator);
+        store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
+
+        assertEq(store.balanceOf(buyer, id), amount);
+        assertEq(IERC20(tokenContract).balanceOf(buyer), 0);
+        assertEq(IERC20(tokenContract).balanceOf(creator), total);
+    }
+
+    function testPurchaseWithAuthorizationInvalidWorkId() public {
+        address buyer = makeAddr("1");
+
+        uint256 id = 0;
+        uint256 amount = 2;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1000;
+        bytes32 nonce = keccak256("nonce");
+        uint8 v = 0;
+        bytes32 r = bytes32(0);
+        bytes32 s = bytes32(0);
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
+
+        store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function testPurchaseWithAuthorizationInvalidTokenContractWithEoa() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(0);
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1000;
+        bytes32 nonce = keccak256("nonce");
+        uint8 v = 0;
+        bytes32 r = bytes32(0);
+        bytes32 s = bytes32(0);
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+
+        store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
+    }
+
+    function testPurchaseWithAuthorizationInvalidTokenContractWithErc20() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new TestERC20Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 validAfter = block.timestamp - 1;
+        uint256 validBefore = block.timestamp + 1000;
+        bytes32 nonce = keccak256("nonce");
+        uint8 v = 0;
+        bytes32 r = bytes32(0);
+        bytes32 s = bytes32(0);
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+
+        store.purchaseWithAuthorization(buyer, id, amount, validAfter, validBefore, nonce, v, r, s);
     }
 
     function testWithdraw() public {
