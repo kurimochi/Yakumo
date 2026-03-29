@@ -30,7 +30,7 @@ contract PurchaseDelegateTest is Test {
         (delegator, secretKey) = makeAddrAndKey("2");
     }
 
-    function test_PurchaseDelegate() public {
+    function testPurchaseDelegate() public {
         vm.signAndAttachDelegation(address(delegate), secretKey);
 
         vm.txGasPrice(1);
@@ -48,7 +48,7 @@ contract PurchaseDelegateTest is Test {
         assertLt(sponsorBalanceBefore - sponsor.balance, price);
     }
 
-    function test_PurchaseDelegateHaveNoEth() public {
+    function testPurchaseDelegateHaveNoEth() public {
         vm.signAndAttachDelegation(address(delegate), secretKey);
 
         vm.prank(sponsor);

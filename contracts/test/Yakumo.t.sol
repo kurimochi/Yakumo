@@ -7,7 +7,8 @@ import {stdError} from "forge-std/StdError.sol";
 import {YakumoStore} from "../src/Yakumo.sol";
 import {Rejector} from "./Rejector.sol";
 import {ReentrancyAttaker} from "./Reentrance.sol";
-import {TestERC20Token} from "./Tokens.sol";
+import {TestERC20Token, FalseERC20Token} from "./Tokens.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract YakumoStoreTest is Test {
     using stdStorage for StdStorage;
@@ -36,7 +37,7 @@ contract YakumoStoreTest is Test {
         vm.store(address(store), structSlot, bytes32(uint256(uint160(creator))));
         vm.store(address(store), bytes32(uint256(structSlot) + 2), bytes32(transferable ? uint256(1) : uint256(0)));
         vm.store(address(store), bytes32(uint256(structSlot) + 3), bytes32(price));
-        vm.store(address(store), bytes32(uint256(structSlot) + 5), bytes32(uint256(uint160(tokenContract))));
+        vm.store(address(store), bytes32(uint256(structSlot) + 4), bytes32(uint256(uint160(tokenContract))));
 
         bytes memory metadataUriBytes = bytes(metadataUri);
         if (metadataUriBytes.length <= 31) {
@@ -63,12 +64,12 @@ contract YakumoStoreTest is Test {
         stdstore.target(address(store)).sig("pendingWithdrawals(address)").with_key(account).checked_write(amount);
     }
 
-    function _setBalance(address account, uint256 id, uint256 amount) internal {
+    function _setEditionsBalance(address account, uint256 id, uint256 amount) internal {
         stdstore.target(address(store)).sig("balanceOf(address,uint256)").with_key(account).with_key(id)
             .checked_write(amount);
     }
 
-    function test_RegisterWork() public {
+    function testRegisterWork() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -98,7 +99,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.idCounter(), 1);
     }
 
-    function test_RegisterWorkWithErc20() public {
+    function testRegisterWorkWithErc20() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -110,7 +111,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_RegisterWorkWithEoa() public {
+    function testRegisterWorkWithEoa() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -123,7 +124,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_RegisterWorkWithInvalidContract() public {
+    function testRegisterWorkWithInvalidContract() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -136,7 +137,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_RegisterWorkIdCounterOverflow() public {
+    function testRegisterWorkIdCounterOverflow() public {
         stdstore.target(address(store)).sig("idCounter()").checked_write(UINT256_MAX);
 
         address creator = makeAddr("1");
@@ -151,7 +152,7 @@ contract YakumoStoreTest is Test {
         store.registerWork(metadataUri, transferable, price, tokenContract);
     }
 
-    function test_ChangePrice() public {
+    function testChangePrice() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -175,7 +176,7 @@ contract YakumoStoreTest is Test {
         assertEq(workTokenContract, tokenContract);
     }
 
-    function test_ChangePriceFromErc20() public {
+    function testChangePriceFromErc20() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -198,7 +199,7 @@ contract YakumoStoreTest is Test {
         assertEq(workTokenContract, newTokenContract);
     }
 
-    function test_ChangePriceWithEoa() public {
+    function testChangePriceWithEoa() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -219,7 +220,7 @@ contract YakumoStoreTest is Test {
         assertEq(workTokenContract, previousTokenContract);
     }
 
-    function test_ChangePriceWithInvalidContract() public {
+    function testChangePriceWithInvalidContract() public {
         address creator = makeAddr("1");
         string memory metadataUri = "hogehoge";
         bool transferable = false;
@@ -240,7 +241,7 @@ contract YakumoStoreTest is Test {
         assertEq(workTokenContract, previousTokenContract);
     }
 
-    function test_ChangePriceNotCreator() public {
+    function testChangePriceNotCreator() public {
         address creator = makeAddr("1");
         address attacker = makeAddr("2");
         string memory metadataUri = "hogehoge";
@@ -259,7 +260,7 @@ contract YakumoStoreTest is Test {
         store.changePrice(id, newPrice, tokenContract);
     }
 
-    function test_Purchase() public {
+    function testPurchaseWithEth() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         string memory metadataUri = "hogehoge";
@@ -282,13 +283,36 @@ contract YakumoStoreTest is Test {
         emit YakumoStore.Purchased(buyer, id, amount);
 
         vm.prank(buyer);
-        store.purchase{value: total}(id, amount);
+        store.purchaseWithEth{value: total}(id, amount);
 
         assertEq(store.balanceOf(buyer, id), amount);
         assertEq(store.pendingWithdrawals(creator), total);
     }
 
-    function test_PurchaseInvalidWorkId() public {
+    function testPurchaseWithEthInvalidTokenContract() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+        address tokenContract = address(new TestERC20Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 total = price * amount;
+
+        vm.deal(buyer, total);
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+
+        store.purchaseWithEth{value: total}(id, amount);
+    }
+
+    function testPurchaseWithEthInvalidWorkId() public {
         address buyer = makeAddr("1");
 
         uint256 id = 0;
@@ -297,10 +321,10 @@ contract YakumoStoreTest is Test {
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.InvalidWorkId.selector);
 
-        store.purchase(id, amount);
+        store.purchaseWithEth(id, amount);
     }
 
-    function test_PurchaseIncorrectPaymentLess() public {
+    function testPurchaseWithEthIncorrectPaymentLess() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         string memory metadataUri = "hogehoge";
@@ -317,10 +341,10 @@ contract YakumoStoreTest is Test {
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.IncorrectPayment.selector);
 
-        store.purchase(id, amount);
+        store.purchaseWithEth(id, amount);
     }
 
-    function test_PurchaseIncorrectPaymentGreater() public {
+    function testPurchaseWithEthIncorrectPaymentGreater() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         string memory metadataUri = "hogehoge";
@@ -339,10 +363,118 @@ contract YakumoStoreTest is Test {
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.IncorrectPayment.selector);
 
-        store.purchase{value: total}(id, amount);
+        store.purchaseWithEth{value: total}(id, amount);
     }
 
-    function test_Withdraw() public {
+    function testPurchaseWithErc20() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new TestERC20Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 total = price * amount;
+
+        TestERC20Token(tokenContract).mint(buyer, total);
+
+        vm.startPrank(buyer);
+        IERC20(tokenContract).approve(address(store), total);
+        store.purchaseWithErc20(id, amount);
+
+        assertEq(store.balanceOf(buyer, id), amount);
+        assertEq(IERC20(tokenContract).balanceOf(buyer), 0);
+        assertEq(IERC20(tokenContract).balanceOf(creator), total);
+    }
+
+    function testPurchaseWithErc20InvalidTokenContract() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(0);
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+
+        store.purchaseWithErc20(id, amount);
+    }
+
+    function testPurchaseWithErc20InvalidWorkId() public {
+        address buyer = makeAddr("1");
+
+        uint256 id = 0;
+        uint256 amount = 2;
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
+
+        store.purchaseWithErc20(id, amount);
+    }
+
+    function testPurchaseWithErc20IncorrectPayment() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new TestERC20Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 total = price * amount;
+
+        TestERC20Token(tokenContract).mint(buyer, total - 1);
+
+        vm.prank(buyer);
+        vm.expectRevert();
+
+        store.purchaseWithErc20(id, amount);
+    }
+
+    function testPurchaseWithErc20TransferFailed() public {
+        address creator = makeAddr("1");
+        address buyer = makeAddr("2");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address tokenContract = address(new FalseERC20Token());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 2;
+        uint256 total = price * amount;
+
+        FalseERC20Token(tokenContract).mint(buyer, total);
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.TransferFailed.selector);
+
+        store.purchaseWithErc20(id, amount);
+    }
+
+    function testWithdraw() public {
         address creator = makeAddr("1");
         uint256 price = 1 ether;
 
@@ -361,7 +493,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.pendingWithdrawals(creator), 0);
     }
 
-    function test_WithdrawNoPendingWithdrawal() public {
+    function testWithdrawNoPendingWithdrawal() public {
         address account = makeAddr("1");
 
         vm.prank(account);
@@ -370,7 +502,7 @@ contract YakumoStoreTest is Test {
         store.withdraw();
     }
 
-    function test_WithdrawWithdrawalFailed() public {
+    function testWithdrawWithdrawalFailed() public {
         address rejector = address(new Rejector());
         uint256 price = 1 ether;
 
@@ -385,7 +517,7 @@ contract YakumoStoreTest is Test {
         store.withdraw();
     }
 
-    function test_WithdrawReentrancy() public {
+    function testWithdrawReentrancy() public {
         address creator = makeAddr("1");
         uint256 price = 1 ether;
 
@@ -406,7 +538,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.pendingWithdrawals(creator), total);
     }
 
-    function test_transferWithTransferable() public {
+    function testTransferWithTransferable() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         address receiver = makeAddr("3");
@@ -416,7 +548,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
-        _setBalance(buyer, 0, 1);
+        _setEditionsBalance(buyer, 0, 1);
 
         vm.prank(buyer);
         vm.expectEmit(true, true, true, true);
@@ -429,7 +561,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.balanceOf(receiver, 0), 1);
     }
 
-    function test_transferWithUntransferable() public {
+    function testTransferWithUntransferable() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
         address receiver = makeAddr("3");
@@ -439,7 +571,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
-        _setBalance(buyer, 0, 1);
+        _setEditionsBalance(buyer, 0, 1);
 
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.NonTransferable.selector);
@@ -447,7 +579,7 @@ contract YakumoStoreTest is Test {
         store.transfer(receiver, 0, 1);
     }
 
-    function test_transferFromWithTransferable() public {
+    function testTransferFromWithTransferable() public {
         address creator = makeAddr("1");
         address owner = makeAddr("2");
         address spender = makeAddr("3");
@@ -458,7 +590,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
-        _setBalance(owner, 0, 2);
+        _setEditionsBalance(owner, 0, 2);
 
         vm.prank(owner);
         store.approve(spender, 0, 1);
@@ -474,7 +606,7 @@ contract YakumoStoreTest is Test {
         assertEq(store.balanceOf(receiver, 0), 1);
     }
 
-    function test_transferFromWithUntransferable() public {
+    function testTransferFromWithUntransferable() public {
         address creator = makeAddr("1");
         address owner = makeAddr("2");
         address spender = makeAddr("3");
@@ -485,7 +617,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
-        _setBalance(owner, 0, 1);
+        _setEditionsBalance(owner, 0, 1);
 
         vm.prank(owner);
         store.approve(spender, 0, 1);

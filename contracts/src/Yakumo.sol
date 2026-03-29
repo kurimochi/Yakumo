@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {ERC6909} from "@openzeppelin/contracts/token/ERC6909/ERC6909.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract YakumoStore is ERC6909 {
     struct Work {
@@ -27,6 +28,7 @@ contract YakumoStore is ERC6909 {
     error ArrayLengthMismatch();
     error InvalidWorkId();
     error IncorrectPayment();
+    error TransferFailed();
     error NoPendingWithdrawal();
     error WithdrawalFailed();
     error NonTransferable();
@@ -67,9 +69,12 @@ contract YakumoStore is ERC6909 {
         emit PriceChanged(id, previousPrice, newPrice, newTokenContract);
     }
 
-    function purchase(uint256 id, uint256 amount) external payable {
+    function purchaseWithEth(uint256 id, uint256 amount) external payable {
         if (id >= idCounter) {
             revert InvalidWorkId();
+        }
+        if (works[id].tokenContract != address(0)) {
+            revert InvalidTokenContract();
         }
 
         uint256 total = works[id].price * amount;
@@ -82,6 +87,28 @@ contract YakumoStore is ERC6909 {
 
         address creator = works[id].creator;
         pendingWithdrawals[creator] += total;
+        emit Purchased(msg.sender, id, amount);
+    }
+
+    function purchaseWithErc20(uint256 id, uint256 amount) external {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
+
+        address tokenContract = works[id].tokenContract;
+        if (tokenContract == address(0)) {
+            revert InvalidTokenContract();
+        }
+
+        uint256 total = works[id].price * amount;
+        bool success = IERC20(tokenContract).transferFrom(msg.sender, works[id].creator, total);
+        if (!success) {
+            revert TransferFailed();
+        }
+
+        _mint(msg.sender, id, amount);
+        emit EditionMinted(id, msg.sender, amount);
+
         emit Purchased(msg.sender, id, amount);
     }
 

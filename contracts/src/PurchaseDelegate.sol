@@ -10,6 +10,6 @@ contract PurchaseDelegate {
         (,,, uint256 price,) = store.works(id);
         uint256 total = price * amount;
 
-        store.purchase{value: total}(id, amount);
+        store.purchaseWithEth{value: total}(id, amount);
     }
 }
