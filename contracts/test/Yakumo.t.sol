@@ -165,13 +165,79 @@ contract YakumoStoreTest is Test {
         _setIdCounter(1);
 
         vm.expectEmit(true, false, false, true);
-        emit YakumoStore.PriceChanged(id, previousPrice, newPrice);
+        emit YakumoStore.PriceChanged(id, previousPrice, newPrice, tokenContract);
 
         vm.prank(creator);
-        store.changePrice(id, newPrice);
+        store.changePrice(id, newPrice, tokenContract);
 
-        (,,, uint256 price,) = store.works(id);
+        (,,, uint256 price, address workTokenContract) = store.works(id);
         assertEq(price, newPrice);
+        assertEq(workTokenContract, tokenContract);
+    }
+
+    function test_ChangePriceFromErc20() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address previousTokenContract = address(new TestERC20Token());
+        address newTokenContract = address(0);
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, previousTokenContract);
+        _setIdCounter(1);
+
+        vm.expectEmit(true, false, false, true);
+        emit YakumoStore.PriceChanged(id, price, price, newTokenContract);
+
+        vm.prank(creator);
+        store.changePrice(id, price, newTokenContract);
+
+        (,,,, address workTokenContract) = store.works(id);
+        assertEq(workTokenContract, newTokenContract);
+    }
+
+    function test_ChangePriceWithEoa() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address previousTokenContract = address(0);
+        address newTokenContract = makeAddr("2");
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, previousTokenContract);
+        _setIdCounter(1);
+
+        vm.prank(creator);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        store.changePrice(id, price, newTokenContract);
+
+        (,,,, address workTokenContract) = store.works(id);
+        assertEq(workTokenContract, previousTokenContract);
+    }
+
+    function test_ChangePriceWithInvalidContract() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 1 ether;
+
+        address previousTokenContract = address(0);
+        address newTokenContract = address(new Rejector());
+
+        uint256 id = 0;
+        _setWork(id, creator, metadataUri, transferable, price, previousTokenContract);
+        _setIdCounter(1);
+
+        vm.prank(creator);
+        vm.expectRevert(YakumoStore.InvalidTokenContract.selector);
+        store.changePrice(id, price, newTokenContract);
+
+        (,,,, address workTokenContract) = store.works(id);
+        assertEq(workTokenContract, previousTokenContract);
     }
 
     function test_ChangePriceNotCreator() public {
@@ -190,7 +256,7 @@ contract YakumoStoreTest is Test {
 
         vm.prank(attacker);
         vm.expectRevert(YakumoStore.NotCreator.selector);
-        store.changePrice(id, newPrice);
+        store.changePrice(id, newPrice, tokenContract);
     }
 
     function test_Purchase() public {

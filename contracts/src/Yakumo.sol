@@ -19,7 +19,7 @@ contract YakumoStore is ERC6909 {
     event WorkRegistered(uint256 indexed id, address indexed creator);
     event EditionMinted(uint256 indexed id, address indexed to, uint256 amount);
     event EditionTransferred(uint256 indexed id, address indexed from, address indexed to, uint256 amount);
-    event PriceChanged(uint256 indexed id, uint256 previousPrice, uint256 newPrice);
+    event PriceChanged(uint256 indexed id, uint256 previousPrice, uint256 newPrice, address newTokenContract);
     event Purchased(address indexed buyer, uint256 indexed id, uint256 amount);
     event Withdrawn(address indexed creator, uint256 amount);
 
@@ -52,14 +52,19 @@ contract YakumoStore is ERC6909 {
         return idCounter - 1;
     }
 
-    function changePrice(uint256 id, uint256 newPrice) external {
+    function changePrice(uint256 id, uint256 newPrice, address newTokenContract) external {
         if (msg.sender != works[id].creator) {
             revert NotCreator();
         }
+        if (newTokenContract != address(0) && !_supportsErc20(newTokenContract)) {
+            revert InvalidTokenContract();
+        }
+
         uint256 previousPrice = works[id].price;
         works[id].price = newPrice;
+        works[id].tokenContract = newTokenContract;
 
-        emit PriceChanged(id, previousPrice, newPrice);
+        emit PriceChanged(id, previousPrice, newPrice, newTokenContract);
     }
 
     function purchase(uint256 id, uint256 amount) external payable {
