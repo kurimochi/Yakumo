@@ -32,11 +32,6 @@ contract PurchaseDelegateTest is Test {
     function test_PurchaseDelegate() public {
         vm.signAndAttachDelegation(address(delegate), secretKey);
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 1;
-
         vm.txGasPrice(1);
         vm.deal(sponsor, 10 ether);
         vm.deal(delegator, price);
@@ -45,7 +40,7 @@ contract PurchaseDelegateTest is Test {
         uint256 delegatorBalanceBefore = delegator.balance;
 
         vm.prank(sponsor);
-        PurchaseDelegate(payable(delegator)).executePurchase(store, ids, amounts);
+        PurchaseDelegate(payable(delegator)).executePurchase(store, id, 1);
 
         assertEq(delegator.balance, delegatorBalanceBefore - price);
         assertLe(sponsor.balance, sponsorBalanceBefore);
@@ -55,29 +50,8 @@ contract PurchaseDelegateTest is Test {
     function test_PurchaseDelegateHaveNoEth() public {
         vm.signAndAttachDelegation(address(delegate), secretKey);
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 1;
-
         vm.prank(sponsor);
         vm.expectRevert();
-        PurchaseDelegate(payable(delegator)).executePurchase(store, ids, amounts);
-    }
-
-    function test_PurchaseDelegateArrayLengthMismatch() public {
-        vm.signAndAttachDelegation(address(delegate), secretKey);
-
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = 1;
-        amounts[1] = 2;
-
-        vm.deal(delegator, price);
-
-        vm.prank(sponsor);
-        vm.expectRevert(PurchaseDelegate.ArrayLengthMismatch.selector);
-        PurchaseDelegate(payable(delegator)).executePurchase(store, ids, amounts);
+        PurchaseDelegate(payable(delegator)).executePurchase(store, id, 1);
     }
 }

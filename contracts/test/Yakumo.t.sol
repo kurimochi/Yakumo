@@ -159,97 +159,22 @@ contract YakumoStoreTest is Test {
         emit YakumoStore.Purchased(buyer, id, amount);
 
         vm.prank(buyer);
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-        store.purchase{value: total}(ids, amounts);
+        store.purchase{value: total}(id, amount);
 
         assertEq(store.balanceOf(buyer, id), amount);
         assertEq(store.pendingWithdrawals(creator), total);
     }
 
-    function test_PuchaseMultiple() public {
-        address creator1 = makeAddr("1");
-        address creator2 = makeAddr("2");
-        address buyer = makeAddr("3");
-
-        string memory metadataUri1 = "hogehoge";
-        bool transferable1 = false;
-        uint256 price1 = 1 ether;
-
-        uint256 id1 = 0;
-        _setWork(id1, creator1, metadataUri1, transferable1, price1);
-
-        string memory metadataUri2 = "fugafuga";
-        bool transferable2 = false;
-        uint256 price2 = 2 ether;
-
-        uint256 id2 = 1;
-        _setWork(id2, creator2, metadataUri2, transferable2, price2);
-        _setIdCounter(2);
-
-        uint256 amount1 = 2;
-        uint256 total1 = price1 * amount1;
-
-        uint256 amount2 = 3;
-        uint256 total2 = price2 * amount2;
-
-        uint256 total = total1 + total2;
-        vm.deal(buyer, total);
-
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.EditionMinted(id1, buyer, amount1);
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.Purchased(buyer, id1, amount1);
-
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.EditionMinted(id2, buyer, amount2);
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.Purchased(buyer, id2, amount2);
-
-        vm.prank(buyer);
-        uint256[] memory ids = new uint256[](2);
-        ids[0] = id1;
-        ids[1] = id2;
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = amount1;
-        amounts[1] = amount2;
-        store.purchase{value: total}(ids, amounts);
-
-        assertEq(store.balanceOf(buyer, id1), amount1);
-        assertEq(store.pendingWithdrawals(creator1), total1);
-        assertEq(store.balanceOf(buyer, id2), amount2);
-        assertEq(store.pendingWithdrawals(creator2), total2);
-    }
-
-    function test_PurchaseArrayLengthMismatch() public {
-        address buyer = makeAddr("1");
-
-        uint256[] memory ids = new uint256[](2);
-        ids[0] = 0;
-        ids[1] = 1;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 2;
-
-        vm.prank(buyer);
-        vm.expectRevert(YakumoStore.ArrayLengthMismatch.selector);
-
-        store.purchase(ids, amounts);
-    }
-
     function test_PurchaseInvalidWorkId() public {
         address buyer = makeAddr("1");
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = 0;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = 2;
+        uint256 id = 0;
+        uint256 amount = 2;
 
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.InvalidWorkId.selector);
 
-        store.purchase(ids, amounts);
+        store.purchase(id, amount);
     }
 
     function test_PurchaseIncorrectPaymentLess() public {
@@ -265,15 +190,10 @@ contract YakumoStoreTest is Test {
 
         uint256 amount = 2;
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.IncorrectPayment.selector);
 
-        store.purchase(ids, amounts);
+        store.purchase(id, amount);
     }
 
     function test_PurchaseIncorrectPaymentGreater() public {
@@ -291,15 +211,10 @@ contract YakumoStoreTest is Test {
         uint256 total = price * amount + 1;
         vm.deal(buyer, total);
 
-        uint256[] memory ids = new uint256[](1);
-        ids[0] = id;
-        uint256[] memory amounts = new uint256[](1);
-        amounts[0] = amount;
-
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.IncorrectPayment.selector);
 
-        store.purchase{value: total}(ids, amounts);
+        store.purchase{value: total}(id, amount);
     }
 
     function test_Withdraw() public {

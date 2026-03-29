@@ -49,42 +49,22 @@ contract YakumoStore is ERC6909 {
         emit PriceChanged(id, previousPrice, newPrice);
     }
 
-    function purchase(uint256[] calldata ids, uint256[] calldata amounts) external payable {
-        if (ids.length != amounts.length) {
-            revert ArrayLengthMismatch();
+    function purchase(uint256 id, uint256 amount) external payable {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
         }
 
-        uint256 total = 0;
-        uint256 maxId = idCounter;
-        for (uint256 i = 0; i < ids.length;) {
-            uint256 id = ids[i];
-            if (id >= maxId) {
-                revert InvalidWorkId();
-            }
-            total += works[id].price * amounts[i];
-            unchecked {
-                ++i;
-            }
-        }
+        uint256 total = works[id].price * amount;
         if (msg.value != total) {
             revert IncorrectPayment();
         }
 
-        for (uint256 i = 0; i < ids.length;) {
-            uint256 id = ids[i];
-            uint256 amount = amounts[i];
-            uint256 price = works[id].price;
-            _mint(msg.sender, id, amount);
-            emit EditionMinted(id, msg.sender, amount);
+        _mint(msg.sender, id, amount);
+        emit EditionMinted(id, msg.sender, amount);
 
-            address creator = works[id].creator;
-            pendingWithdrawals[creator] += price * amount;
-            emit Purchased(msg.sender, id, amount);
-
-            unchecked {
-                ++i;
-            }
-        }
+        address creator = works[id].creator;
+        pendingWithdrawals[creator] += total;
+        emit Purchased(msg.sender, id, amount);
     }
 
     function withdraw() external {
