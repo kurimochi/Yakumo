@@ -261,6 +261,15 @@ contract YakumoStoreTest is Test {
         store.changePrice(id, newPrice, tokenContract);
     }
 
+    function testChangePriceInvalidWorkId() public {
+        address creator = makeAddr("1");
+        uint256 id = 0;
+
+        vm.prank(creator);
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
+        store.changePrice(id, 1 ether, address(0));
+    }
+
     function testPurchaseWithEth() public {
         address creator = makeAddr("1");
         address buyer = makeAddr("2");
@@ -677,6 +686,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
         _setEditionsBalance(buyer, 0, 1);
 
         vm.prank(buyer);
@@ -700,11 +710,21 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
         _setEditionsBalance(buyer, 0, 1);
 
         vm.prank(buyer);
         vm.expectRevert(YakumoStore.NonTransferable.selector);
 
+        store.transfer(receiver, 0, 1);
+    }
+
+    function testTransferInvalidWorkId() public {
+        address buyer = makeAddr("1");
+        address receiver = makeAddr("2");
+
+        vm.prank(buyer);
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
         store.transfer(receiver, 0, 1);
     }
 
@@ -719,6 +739,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
         _setEditionsBalance(owner, 0, 2);
 
         vm.prank(owner);
@@ -746,6 +767,7 @@ contract YakumoStoreTest is Test {
         address tokenContract = address(0);
 
         _setWork(0, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
         _setEditionsBalance(owner, 0, 1);
 
         vm.prank(owner);
@@ -754,6 +776,16 @@ contract YakumoStoreTest is Test {
         vm.prank(spender);
         vm.expectRevert(YakumoStore.NonTransferable.selector);
 
+        store.transferFrom(owner, receiver, 0, 1);
+    }
+
+    function testTransferFromInvalidWorkId() public {
+        address owner = makeAddr("1");
+        address spender = makeAddr("2");
+        address receiver = makeAddr("3");
+
+        vm.prank(spender);
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
         store.transferFrom(owner, receiver, 0, 1);
     }
 }

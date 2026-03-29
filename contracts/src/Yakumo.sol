@@ -56,6 +56,9 @@ contract YakumoStore is ERC6909 {
     }
 
     function changePrice(uint256 id, uint256 newPrice, address newTokenContract) external {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
         if (msg.sender != works[id].creator) {
             revert NotCreator();
         }
@@ -162,6 +165,9 @@ contract YakumoStore is ERC6909 {
     }
 
     function transfer(address receiver, uint256 id, uint256 amount) public virtual override returns (bool) {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
         if (!isTransferable(id)) {
             revert NonTransferable();
         }
@@ -176,6 +182,9 @@ contract YakumoStore is ERC6909 {
         override
         returns (bool)
     {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
         if (!isTransferable(id)) {
             revert NonTransferable();
         }
