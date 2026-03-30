@@ -289,8 +289,6 @@ contract YakumoStoreTest is Test {
         vm.deal(buyer, total);
 
         vm.expectEmit(true, true, false, true);
-        emit YakumoStore.EditionMinted(id, buyer, amount);
-        vm.expectEmit(true, true, false, true);
         emit YakumoStore.Purchased(buyer, id, amount);
 
         vm.prank(buyer);
@@ -398,8 +396,6 @@ contract YakumoStoreTest is Test {
         vm.startPrank(buyer);
         IERC20(tokenContract).approve(address(store), total);
 
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.EditionMinted(id, buyer, amount);
         vm.expectEmit(true, true, false, true);
         emit YakumoStore.Purchased(buyer, id, amount);
 
@@ -528,8 +524,6 @@ contract YakumoStoreTest is Test {
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buyerPrivateKey, digest);
 
-        vm.expectEmit(true, true, false, true);
-        emit YakumoStore.EditionMinted(id, buyer, amount);
         vm.expectEmit(true, true, false, true);
         emit YakumoStore.Purchased(buyer, id, amount);
 
@@ -664,8 +658,6 @@ contract YakumoStoreTest is Test {
         _setEditionsBalance(buyer, 0, 1);
 
         vm.prank(buyer);
-        vm.expectEmit(true, true, true, true);
-        emit YakumoStore.EditionTransferred(0, buyer, receiver, 1);
 
         bool result = store.transfer(receiver, 0, 1);
         assertTrue(result);
@@ -720,8 +712,6 @@ contract YakumoStoreTest is Test {
         store.approve(spender, 0, 1);
 
         vm.prank(spender);
-        vm.expectEmit(true, true, true, true);
-        emit YakumoStore.EditionTransferred(0, owner, receiver, 1);
 
         bool result = store.transferFrom(owner, receiver, 0, 1);
         assertTrue(result);

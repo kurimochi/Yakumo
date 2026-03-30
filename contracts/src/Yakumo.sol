@@ -22,8 +22,6 @@ contract YakumoStore is ERC6909 {
     mapping(address => uint256) public pendingWithdrawals;
 
     event WorkRegistered(uint256 indexed id, address indexed creator);
-    event EditionMinted(uint256 indexed id, address indexed to, uint256 amount);
-    event EditionTransferred(uint256 indexed id, address indexed from, address indexed to, uint256 amount);
     event PriceChanged(uint256 indexed id, uint256 previousPrice, uint256 newPrice, address newTokenContract);
     event Purchased(address indexed buyer, uint256 indexed id, uint256 amount);
     event Withdrawn(address indexed creator, uint256 amount);
@@ -83,7 +81,6 @@ contract YakumoStore is ERC6909 {
         }
 
         _mint(msg.sender, id, amount);
-        emit EditionMinted(id, msg.sender, amount);
 
         address creator = works[id].creator;
         pendingWithdrawals[creator] += total;
@@ -104,7 +101,6 @@ contract YakumoStore is ERC6909 {
         IERC20(tokenContract).safeTransferFrom(msg.sender, works[id].creator, total);
 
         _mint(msg.sender, id, amount);
-        emit EditionMinted(id, msg.sender, amount);
 
         emit Purchased(msg.sender, id, amount);
     }
@@ -133,7 +129,6 @@ contract YakumoStore is ERC6909 {
             .transferWithAuthorization(buyer, works[id].creator, total, validAfter, validBefore, nonce, v, r, s);
 
         _mint(buyer, id, amount);
-        emit EditionMinted(id, buyer, amount);
 
         emit Purchased(buyer, id, amount);
     }
@@ -163,9 +158,7 @@ contract YakumoStore is ERC6909 {
         if (!isTransferable(id)) {
             revert NonTransferable();
         }
-        bool result = super.transfer(receiver, id, amount);
-        emit EditionTransferred(id, msg.sender, receiver, amount);
-        return result;
+        return super.transfer(receiver, id, amount);
     }
 
     function transferFrom(address sender, address receiver, uint256 id, uint256 amount)
@@ -180,8 +173,6 @@ contract YakumoStore is ERC6909 {
         if (!isTransferable(id)) {
             revert NonTransferable();
         }
-        bool result = super.transferFrom(sender, receiver, id, amount);
-        emit EditionTransferred(id, sender, receiver, amount);
-        return result;
+        return super.transferFrom(sender, receiver, id, amount);
     }
 }
