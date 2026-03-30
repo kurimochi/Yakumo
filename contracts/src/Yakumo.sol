@@ -27,7 +27,6 @@ contract YakumoStore is ERC6909 {
     event Withdrawn(address indexed creator, uint256 amount);
 
     error NotCreator();
-    error ArrayLengthMismatch();
     error InvalidWorkId();
     error IncorrectPayment();
     error NoPendingWithdrawal();
