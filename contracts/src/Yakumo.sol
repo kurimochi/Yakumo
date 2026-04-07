@@ -41,12 +41,12 @@ contract YakumoStore is ERC6909 {
         _;
     }
 
-    function _getTotalPrice(uint256 id, uint256 amount) internal view returns (uint256) {
-        return works[id].price * amount;
+    function _getTotalPrice(Work storage work, uint256 amount) internal view returns (uint256) {
+        return work.price * amount;
     }
 
     function getTotalPrice(uint256 id, uint256 amount) external view requireValidWorkId(id) returns (uint256) {
-        return _getTotalPrice(id, amount);
+        return _getTotalPrice(works[id], amount);
     }
 
     function registerWork(string calldata metadataUri, bool transferable, uint256 price, address tokenContract)
@@ -67,42 +67,48 @@ contract YakumoStore is ERC6909 {
     }
 
     function changePrice(uint256 id, uint256 newPrice, address newTokenContract) external requireValidWorkId(id) {
-        if (msg.sender != works[id].creator) {
+        Work storage work = works[id];
+
+        if (msg.sender != work.creator) {
             revert NotCreator();
         }
 
-        uint256 previousPrice = works[id].price;
-        works[id].price = newPrice;
-        works[id].tokenContract = newTokenContract;
+        uint256 previousPrice = work.price;
+        work.price = newPrice;
+        work.tokenContract = newTokenContract;
 
         emit PriceChanged(id, previousPrice, newPrice, newTokenContract);
     }
 
     function purchaseWithEth(uint256 id, uint256 amount) external payable requireValidWorkId(id) {
-        if (works[id].tokenContract != address(0)) {
+        Work storage work = works[id];
+
+        if (work.tokenContract != address(0)) {
             revert InvalidTokenContract();
         }
 
-        uint256 total = _getTotalPrice(id, amount);
+        uint256 total = _getTotalPrice(work, amount);
         if (msg.value != total) {
             revert IncorrectPayment();
         }
 
         _mint(msg.sender, id, amount);
 
-        address creator = works[id].creator;
+        address creator = work.creator;
         pendingWithdrawals[creator] += total;
         emit Purchased(msg.sender, id, amount);
     }
 
     function purchaseWithErc20(uint256 id, uint256 amount) external requireValidWorkId(id) {
-        address tokenContract = works[id].tokenContract;
+        Work storage work = works[id];
+
+        address tokenContract = work.tokenContract;
         if (tokenContract == address(0)) {
             revert InvalidTokenContract();
         }
 
-        uint256 total = _getTotalPrice(id, amount);
-        IERC20(tokenContract).safeTransferFrom(msg.sender, works[id].creator, total);
+        uint256 total = _getTotalPrice(work, amount);
+        IERC20(tokenContract).safeTransferFrom(msg.sender, work.creator, total);
 
         _mint(msg.sender, id, amount);
 
@@ -120,13 +126,15 @@ contract YakumoStore is ERC6909 {
         bytes32 r,
         bytes32 s
     ) external requireValidWorkId(id) {
-        address tokenContract = works[id].tokenContract;
+        Work storage work = works[id];
+
+        address tokenContract = work.tokenContract;
         if (tokenContract.code.length == 0) {
             revert InvalidTokenContract();
         }
-        uint256 total = _getTotalPrice(id, amount);
+        uint256 total = _getTotalPrice(work, amount);
         IERC3009(tokenContract)
-            .transferWithAuthorization(buyer, works[id].creator, total, validAfter, validBefore, nonce, v, r, s);
+            .transferWithAuthorization(buyer, work.creator, total, validAfter, validBefore, nonce, v, r, s);
 
         _mint(buyer, id, amount);
 
