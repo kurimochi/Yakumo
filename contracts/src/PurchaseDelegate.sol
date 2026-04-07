@@ -11,18 +11,17 @@ contract PurchaseDelegate {
     // --- EIP-7702 Delegate ---
 
     function executePurchaseWithEth(YakumoStore store, uint256 id, uint256 amount) external {
-        (,,, uint256 price,) = store.works(id);
-        uint256 total = price * amount;
+        uint256 total = store.getTotalPrice(id, amount);
 
         store.purchaseWithEth{value: total}(id, amount);
     }
 
     function executePurchaseWithErc20(YakumoStore store, uint256 id, uint256 amount) external {
-        (,,, uint256 price, address tokenContract) = store.works(id);
+        (,,,, address tokenContract) = store.works(id);
         if (tokenContract == address(0)) {
             revert YakumoStore.InvalidTokenContract();
         }
-        uint256 total = price * amount;
+        uint256 total = store.getTotalPrice(id, amount);
 
         IERC20(tokenContract).safeIncreaseAllowance(address(store), total);
 

@@ -41,6 +41,14 @@ contract YakumoStore is ERC6909 {
         _;
     }
 
+    function _getTotalPrice(uint256 id, uint256 amount) internal view returns (uint256) {
+        return works[id].price * amount;
+    }
+
+    function getTotalPrice(uint256 id, uint256 amount) external view requireValidWorkId(id) returns (uint256) {
+        return _getTotalPrice(id, amount);
+    }
+
     function registerWork(string calldata metadataUri, bool transferable, uint256 price, address tokenContract)
         external
         returns (uint256)
@@ -75,7 +83,7 @@ contract YakumoStore is ERC6909 {
             revert InvalidTokenContract();
         }
 
-        uint256 total = works[id].price * amount;
+        uint256 total = _getTotalPrice(id, amount);
         if (msg.value != total) {
             revert IncorrectPayment();
         }
@@ -93,7 +101,7 @@ contract YakumoStore is ERC6909 {
             revert InvalidTokenContract();
         }
 
-        uint256 total = works[id].price * amount;
+        uint256 total = _getTotalPrice(id, amount);
         IERC20(tokenContract).safeTransferFrom(msg.sender, works[id].creator, total);
 
         _mint(msg.sender, id, amount);
@@ -116,7 +124,7 @@ contract YakumoStore is ERC6909 {
         if (tokenContract.code.length == 0) {
             revert InvalidTokenContract();
         }
-        uint256 total = works[id].price * amount;
+        uint256 total = _getTotalPrice(id, amount);
         IERC3009(tokenContract)
             .transferWithAuthorization(buyer, works[id].creator, total, validAfter, validBefore, nonce, v, r, s);
 

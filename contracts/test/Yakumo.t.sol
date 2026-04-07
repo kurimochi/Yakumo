@@ -752,4 +752,28 @@ contract YakumoStoreTest is Test {
         vm.expectRevert(YakumoStore.InvalidWorkId.selector);
         store.transferFrom(owner, receiver, 0, 1);
     }
+
+    function testGetTotalPrice() public {
+        address creator = makeAddr("1");
+        string memory metadataUri = "hogehoge";
+        bool transferable = false;
+        uint256 price = 3 ether;
+        address tokenContract = address(0);
+
+        _setWork(0, creator, metadataUri, transferable, price, tokenContract);
+        _setIdCounter(1);
+
+        uint256 amount = 4;
+        uint256 total = store.getTotalPrice(0, amount);
+
+        assertEq(total, price * amount);
+    }
+
+    function testGetTotalPriceInvalidWorkId() public {
+        uint256 id = 0;
+        uint256 amount = 4;
+
+        vm.expectRevert(YakumoStore.InvalidWorkId.selector);
+        store.getTotalPrice(id, amount);
+    }
 }
