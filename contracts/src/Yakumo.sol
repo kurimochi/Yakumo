@@ -34,6 +34,13 @@ contract YakumoStore is ERC6909 {
     error NonTransferable();
     error InvalidTokenContract();
 
+    modifier requireValidWorkId(uint256 id) {
+        if (id >= idCounter) {
+            revert InvalidWorkId();
+        }
+        _;
+    }
+
     function registerWork(string calldata metadataUri, bool transferable, uint256 price, address tokenContract)
         external
         returns (uint256)
@@ -51,10 +58,7 @@ contract YakumoStore is ERC6909 {
         return idCounter - 1;
     }
 
-    function changePrice(uint256 id, uint256 newPrice, address newTokenContract) external {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
+    function changePrice(uint256 id, uint256 newPrice, address newTokenContract) external requireValidWorkId(id) {
         if (msg.sender != works[id].creator) {
             revert NotCreator();
         }
@@ -66,10 +70,7 @@ contract YakumoStore is ERC6909 {
         emit PriceChanged(id, previousPrice, newPrice, newTokenContract);
     }
 
-    function purchaseWithEth(uint256 id, uint256 amount) external payable {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
+    function purchaseWithEth(uint256 id, uint256 amount) external payable requireValidWorkId(id) {
         if (works[id].tokenContract != address(0)) {
             revert InvalidTokenContract();
         }
@@ -86,11 +87,7 @@ contract YakumoStore is ERC6909 {
         emit Purchased(msg.sender, id, amount);
     }
 
-    function purchaseWithErc20(uint256 id, uint256 amount) external {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
-
+    function purchaseWithErc20(uint256 id, uint256 amount) external requireValidWorkId(id) {
         address tokenContract = works[id].tokenContract;
         if (tokenContract == address(0)) {
             revert InvalidTokenContract();
@@ -114,11 +111,7 @@ contract YakumoStore is ERC6909 {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
-
+    ) external requireValidWorkId(id) {
         address tokenContract = works[id].tokenContract;
         if (tokenContract.code.length == 0) {
             revert InvalidTokenContract();
@@ -146,17 +139,21 @@ contract YakumoStore is ERC6909 {
         }
     }
 
-    function isTransferable(uint256 id) public view returns (bool) {
-        return works[id].transferable;
-    }
-
-    function transfer(address receiver, uint256 id, uint256 amount) public virtual override returns (bool) {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
-        if (!isTransferable(id)) {
+    modifier requireTransferable(uint256 id) {
+        if (!works[id].transferable) {
             revert NonTransferable();
         }
+        _;
+    }
+
+    function transfer(address receiver, uint256 id, uint256 amount)
+        public
+        virtual
+        override
+        requireValidWorkId(id)
+        requireTransferable(id)
+        returns (bool)
+    {
         return super.transfer(receiver, id, amount);
     }
 
@@ -164,14 +161,10 @@ contract YakumoStore is ERC6909 {
         public
         virtual
         override
+        requireValidWorkId(id)
+        requireTransferable(id)
         returns (bool)
     {
-        if (id >= idCounter) {
-            revert InvalidWorkId();
-        }
-        if (!isTransferable(id)) {
-            revert NonTransferable();
-        }
         return super.transferFrom(sender, receiver, id, amount);
     }
 }
